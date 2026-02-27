@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kube-scheduler-test
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: kube-scheduler
+  template:
+    metadata:
+      labels:
+        component: kube-scheduler
+    spec:
+      hostNetwork: true
+      containers:
+      - name: kube-scheduler
+        image: k8s.gcr.io/kube-scheduler:v1.30.0
+        command:
+        - kube-scheduler
+        - --kubeconfig=/etc/kubernetes/kubeconfig
+        volumeMounts:
+        - name: kubeconfig
+          mountPath: /etc/kubernetes
+          readOnly: true
+      volumes:
+      - name: kubeconfig
+        hostPath:
+          path: /etc/kubernetes
