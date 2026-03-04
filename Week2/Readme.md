@@ -15,8 +15,6 @@ helm install cilium cilium/cilium \
   --set ipam.mode=kubernetes
 
 
-## check the Node status 
-
 ## check the IP Table rules
 kind create cluster --name iptables-lab --image kindest/node:v1.29.2
 docker exec -it iptables-lab-control-plane bash
@@ -68,3 +66,75 @@ cilium connectivity test
 ## Cilium is enabled or not ? 
 docker exec it cilium-lab-controlplane bash 
 ip route
+
+
+## Demo for IP Tables rules update
+1. Create kind Cluster: 
+   
+- kind create cluster --name iptables-demo --config kind.yaml
+
+2. Create a Nginx Deployment and Expose it: 
+   
+- kubectl create deployment nginx-deployment --image=nginx --replicas=5
+- kubectl expose deployment nginx-deployment --port 80
+- kubectl port-forward svc/nginx-deployment 8080:80
+
+3. Connect to the Controlplane 
+  
+  docker exec -it iptables-demo-control-plane bash
+
+  connect to ingress services: 
+    for i in {1..100}; do 
+    curl 10.96.213.76 :8080
+     sleep 1 
+     done 
+
+1. Check all the IP Tables Rules:
+-  iptables -t nat -L 
+-  iptables -t nat -L KUBE-SERVICES // check for the nginx service 
+
+Now delete the nginx pods, automatically these rules are updated for the nginx services
+
+-  iptables -t nat -L KUBE-SVC-WRNOD73BKRQH4VVX
+
+# Mode of IP tables:  iptables / ipvs / userspace 
+
+kubectl get configmap kube-proxy -n kube-system -o yaml | grep mode
+    mode: iptables
+
+
+## Demo cilium 
+1. Create a Minikube cluster 
+   minikube start --driver=docker --memory=4096 --cpus=4   
+2. Install Cilium CLI 
+    https://docs.cilium.io/en/stable/gettingstarted/k8s-install-default/#install-the-cilium-cli
+ cilium install 
+ cilium status 
+ cilium hubble enable --ui 
+ kubectl -n kube-system port-forward svc/hubble-ui 12000:80
+3. Deploy FrontEnd:
+ kubectl create ns demo 
+ kubectl create deployment nginx-backend -n demo  --image=nginx --replicas 4
+kubectl expose deployment nginx-backend -n demo --port 80
+4. Deploy Backend: 
+kubectl create deployment nginx-frontend -n demo  --image=nginx --replicas 4
+kubectl expose deployment nginx-backend -n demo --port 80
+
+5. Create Label 
+kubectl label deployments.apps -n demo nginx-frontend app=frontend --overwrite
+
+kubectl label deployments.apps -n demo nginx-backend app=backend --overwrite
+
+6. Test connectivity: 
+   kubectl -n demo exec -it deployments/nginx-frontend -- sh 
+   curl http://nginx-backend -> you will nginx Access the backend service 
+
+7. Check Hubble 
+   Traffic Forwarded / Traffic Dropped    
+
+
+   Allow or Block Traffic 
+
+8. Check the curl connectivity again 
+9.    kubectl -n demo exec -it deployments/nginx-frontend -- sh 
+   curl http://nginx-backend -> you will nginx Access the backend service  you will see timeout 
