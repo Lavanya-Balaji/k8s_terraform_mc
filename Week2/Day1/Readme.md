@@ -1,10 +1,4 @@
-## Create kind Cluster
-* Multiple controlplane kind Cluster
-* Disable the default CNI - Kindnest and use Calico 
 
-## Check Node Status
-
-kubectl get nodes
 
 ## Install Custom CNI 
 
@@ -138,3 +132,68 @@ kubectl label deployments.apps -n demo nginx-backend app=backend --overwrite
 8. Check the curl connectivity again 
 9.    kubectl -n demo exec -it deployments/nginx-frontend -- sh 
    curl http://nginx-backend -> you will nginx Access the backend service  you will see timeout 
+
+
+
+### ETCD Backup and Restore: 
+
+- create kind Cluster: 
+
+kind create cluster --name etcd
+
+- Create Sample Applications: 
+
+kubectl create ns test
+kubectl create ns test2
+kubectl create ns test3
+kubectl create deployment nginx --image=nginx --replicas 4
+
+- Install ETCDCTL: 
+  
+docker exec -it etcd-control-plane bash
+apt update
+apt install etcd-client -y
+etcdctl version
+
+- Take Snapshot: 
+  
+ETCDCTL_API=3 etcdctl snapshot save snapshot.db   --endpoints=https://127.0.0.1:2379   --cacert=/etc/kubernetes/pki/etcd/ca.crt   --cert=/etc/kubernetes/pki/etcd/server.crt   --key=/etc/kubernetes/pki/etcd/server.key
+
+- Take a Copy of snapshot.db to host machine
+  
+  docker cp etcd-control-plane:/snapshot.db ./snapshot.db
+
+- Restore on to the same cluster 
+  kubectl create ns test4 
+  kubectl create ns test5 
+  kubectl create ns test6
+
+systemctl stop kubelet
+pkill kubelet
+ls /var/lib/etcd
+ETCDCTL_API=3 etcdctl snapshot restore /snapshot.db \
+  --data-dir=/var/lib/etcd
+systemctl start kubelet
+
+Exit the docker and restart the docker container
+docker restart etcd-control-plane
+
+- Restore on to the new cluster
+  
+  kind create cluster --name etcd-new-cluster-restore
+  docker stop etcd-new-cluster-restore-control-plane
+  docker cp snapshot.db etcd-new-cluster-restore-control-plane:/snapshot.db
+  docker start etcd-new-cluster-restore-control-plane
+  pkill kubelet
+  rm -rf /var/lib/etcd
+  apt update
+  apt install etcd-client -y
+  etcdctl version
+  rm -rf /var/lib/etcd
+  ETCDCTL_API=3 etcdctl snapshot restore /snapshot.db \
+    --data-dir=/var/lib/etcd
+  docker restart etcd-new-cluster-restore-control-plane
+  kubectl get ns
+  kubectl get pods -A
+
+
