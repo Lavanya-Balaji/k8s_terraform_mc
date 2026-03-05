@@ -197,3 +197,59 @@ docker restart etcd-control-plane
   kubectl get pods -A
 
 
+## Ingress Controller 
+
+- Create a kind cluster 
+- kubectl edit configmap -n kube-system kube-proxy
+- apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+mode: "ipvs"
+ipvs:
+  strictARP: true
+
+- Install MetaLB 
+  -  kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.7/config/manifests/metallb-native.yaml
+  -  kubectl apply -f metalb.yaml
+- Deploy Ingress Controller 
+- kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+- kubectl get pods -n ingress-nginx
+kubectl get svc -n ingress-nginx
+kubectl edit svc ingress-nginx-controller -n ingress-nginx
+spec:
+  type: LoadBalancer
+  kubectl get svc -n ingress-nginx
+- Create Deployment 
+- apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello
+  template:
+    metadata:
+      labels:
+        app: hello
+    spec:
+      containers:
+      - name: hello
+        image: hashicorp/http-echo
+        args:
+        - "-text=Hello from Kind + MetalLB"
+        ports:
+        - containerPort: 5678
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-service
+spec:
+  selector:
+    app: hello
+  ports:
+  - port: 80
+    targetPort: 5678
+
+    
