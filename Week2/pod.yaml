@@ -1,0 +1,156 @@
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: devops1
+  labels:
+    kubernetes.io/metadata.name: devops1
+---
+
+kubectl create namespace devops2
+
+kubectl label namespace devops2 kubernetes.io/metadata.name=devops2 --overwrite
+
+
+
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: hello
+spec:
+  template:
+    # This is the pod template
+    spec:
+      containers:
+      - name: hello
+        image: busybox:1.28
+        command: ['sh', '-c', 'echo "Hello, Kubernetes!" && sleep 3600']
+      restartPolicy: OnFailure
+    # The pod template ends here
+--- 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-pod-if-init-fails
+spec:
+  restartPolicy: Always
+  initContainers:
+  - name: init-once      # This init container will only try once. If it fails, the pod will fail.
+    image: registry.k8s.io/busybox:1.27.2
+    command: ['sh', '-c', 'echo "Failing initialization" && sleep 10 && exit 1']
+    restartPolicy: Never
+  containers:
+  - name: main-container # This container will always be restarted once initialization succeeds.
+    image: registry.k8s.io/busybox:1.27.2
+    command: ['sh', '-c', 'sleep 1800 && exit 0']
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: app-with-logs
+spec:
+  volumes:
+  - name: log-volume
+    emptyDir: {}
+
+  initContainers:
+  - name: init-log-file
+    image: busybox
+    command: ["sh", "-c", "touch /logs/app.log"]
+    volumeMounts:
+    - name: log-volume
+      mountPath: /logs
+
+  containers:
+  - name: app
+    image: busybox
+    command:
+      - sh
+      - -c
+      - |
+        while true; do
+          echo "Application running at $(date)" >> /logs/app.log
+          sleep 5
+        done
+
+    volumeMounts:
+    - name: log-volume
+      mountPath: /logs
+
+    startupProbe:
+      exec:
+        command: ["cat", "/logs/app.log"]
+      failureThreshold: 30
+      periodSeconds: 10
+
+    livenessProbe:
+      exec:
+        command: ["cat", "/logs/app.log"]
+      periodSeconds: 10
+
+    readinessProbe:
+      exec:
+        command: ["cat", "/logs/app.log"]
+      periodSeconds: 5
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        resources:
+          requests:
+            cpu: 100m
+          limits:
+            cpu: 200m
+        ports:
+        - containerPort: 80
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nginx-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nginx-deploy
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50        
+
+        # kubectl run -it --rm load-generator --image=busybox -- /bin/sh 
+        # while true; do wget -q -O- http://nginx-deploy; done 
+        # kubectl get hpa -w 
+        # kubectl get deployment metrics-server -n kube-system 
+        # kubectl edit deployment metrics-server -n kube-system
+        # args:
+        # - --cert-dir=/tmp
+        # - --secure-port=10250
+        # - --kubelet-insecure-tls
+        # - --kubelet-preferred-address-types=InternalIP
+
+        # kubectl top nodes 
+        # kubectl top pods 
+    

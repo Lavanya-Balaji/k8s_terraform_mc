@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-demo
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: pod-demo
+  template:
+    metadata:
+      labels:
+        app: pod-demo
+    spec:
+      containers:
+      - name: app
+        image: hashicorp/http-echo
+        args:
+        - "-text=$(POD_NAME)"
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        ports:
+        - containerPort: 5678
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: pod-demo-svc
+spec:
+  selector:
+    app: pod-demo
+  ports:
+  - port: 80
+    targetPort: 5678
+
+    # kubectl run curl --image=busybox -it --rm -- sh
+    # while true; do wget -qO- http://pod-demo-svc; done
+    # kubectl get pods
+# kubectl get svc
+# kubectl get endpoints <service>
+# kubectl get pods --show-labels
