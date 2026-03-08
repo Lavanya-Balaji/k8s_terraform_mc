@@ -162,6 +162,11 @@ etcdctl version
   
 ETCDCTL_API=3 etcdctl snapshot save snapshot.db   --endpoints=https://127.0.0.1:2379   --cacert=/etc/kubernetes/pki/etcd/ca.crt   --cert=/etc/kubernetes/pki/etcd/server.crt   --key=/etc/kubernetes/pki/etcd/server.key
 
+- Create new namespace 
+  kubectl create ns test4 
+  kubectl create ns test5
+kubectl create deployment nginx --image=nginx --replicas 2
+kubectl create deployment nginx --image=nginx --replicas 2 -n test4
 - Take a Copy of snapshot.db to host machine
   
   docker cp etcd-control-plane:/snapshot.db ./snapshot.db
