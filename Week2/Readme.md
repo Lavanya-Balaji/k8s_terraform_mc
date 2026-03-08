@@ -112,7 +112,7 @@ kubectl get configmap kube-proxy -n kube-system -o yaml | grep mode
 kubectl expose deployment nginx-backend -n demo --port 80
 4. Deploy Backend: 
 kubectl create deployment nginx-frontend -n demo  --image=nginx --replicas 4
-kubectl expose deployment nginx-backend -n demo --port 80
+kubectl expose deployment nginx-frontend -n demo --port 80
 
 5. Create Label 
 kubectl label deployments.apps -n demo nginx-frontend app=frontend --overwrite
@@ -124,6 +124,9 @@ kubectl label deployments.apps -n demo nginx-backend app=backend --overwrite
    curl http://nginx-backend -> you will nginx Access the backend service 
 
 7. Check Hubble 
+   - kubectl apply -n demo -f deny-policy.yaml
+   - kubectl -n demo exec -it deployments/nginx-frontend -- sh 
+   - curl http://nginx-backend 
    Traffic Forwarded / Traffic Dropped    
 
 
@@ -252,4 +255,97 @@ spec:
   - port: 80
     targetPort: 5678
 
-    
+### Day 2 Demo of Cilium 
+  - kind create cluster --name cilium
+  - cilium install
+  - cilium status
+  - cilium hubble enable --ui
+  - cilium status
+ # Deploy FrontEnd:
+ kubectl create ns demo 
+ kubectl create deployment nginx-backend -n demo  --image=nginx --replicas 4
+kubectl expose deployment nginx-backend -n demo --port 80
+ # Deploy Backend: 
+kubectl create deployment nginx-frontend -n demo  --image=nginx --replicas 4
+kubectl expose deployment nginx-frontend -n demo --port 80
+
+kubectl label deployments.apps -n demo nginx-frontend app=frontend --overwrite
+
+kubectl label deployments.apps -n demo nginx-backend app=backend --overwrite
+
+kubectl create ns allowdemo
+kubectl create ns denydemo
+kubectl create deployment nginx-frontend -n denydemo  --image=nginx --replicas 4
+kubectl create deployment nginx-frontend -n allowdemo  --image=nginx --replicas 4
+
+kubectl label deployments.apps -n denydemo nginx-frontend app=frontend --overwrite
+kubectl label deployments.apps -n allowdemo nginx-frontend app=frontend --overwrite
+
+
+6. Test connectivity: 
+   kubectl -n demo exec -it deployments/nginx-frontend -- sh 
+   curl http://nginx-backend -> you will nginx Access the backend service 
+   
+Destination	Result
+kube-dns	✅ allowed
+8.8.8.8	✅ allowed
+google.com	✅ allowed
+github.com	✅ allowed
+matrixkube.org	✅ allowed
+nginx-backend	❌ denied (because of egressDeny)
+allowdemo namespace	✅ allowed
+denydemo namespace	❌ denied
+
+
+## Gateway API :
+
+Create a Kind Cluster
+
+cat <<EOF | kind create cluster --name gateway-lab --config=-
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+- role: worker
+EOF
+
+# Install Gateway API CRDs
+
+
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.0/standard-install.yaml
+
+kubectl get crds | grep gateway
+
+# Install Kong Gateway API Controller - creates Gateway, GatewayClass, Routes 
+
+helm upgrade --install kgo kong/gateway-operator \
+  -n kong-system \
+  --create-namespace \
+  --skip-crds
+
+kubectl get pods -n kong-system
+kg gatewayclass 
+# Create Gateway Class: 
+
+kubectl apply -f gatewayclass.yaml 
+
+# Create Gateway: 
+kubectl apply -f gateway.yaml 
+
+
+kubectl get gateway -n kong
+
+# Create Deploy, Service and httproute
+kubectl apply -f hello.yaml
+
+kubectl port-forward svc/kong-gateway 8080:80 -n kong
+
+curl http://localhost:8080
+
+helm repo add kong https://charts.konghq.com
+helm repo update
+
+helm upgrade --install kgo kong/gateway-operator \
+  -n kong-system \
+  --create-namespace
+kubectl get pods -n kong-system

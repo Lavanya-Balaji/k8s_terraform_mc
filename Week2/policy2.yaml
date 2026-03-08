@@ -1,0 +1,90 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: frontend-egress-policy
+  namespace: demo
+
+spec:
+  endpointSelector:
+    matchLabels:
+      app: nginx-frontend
+
+  egress:
+
+  # Allow DNS - L4 Traffic
+  - toEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: kube-system
+        k8s:k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+      - port: "53"
+        protocol: TCP
+
+  # Allow internet IP - L3 Traffic 
+  - toCIDR:
+    - 8.8.8.8/32
+
+  # Allow specific domains - L7 Traffic
+  - toFQDNs:
+    - matchName: google.com
+    - matchName: github.com
+    - matchName: matrixkube.org
+
+  # L7 rule to backend pods - allow only specific paths and methods
+  - toEndpoints:
+    - matchLabels:
+        app: nginx-backend
+    toPorts:
+    - ports:
+      - port: "80"
+        protocol: TCP
+      rules:
+        http:
+        - method: "GET"
+          path: "/health"
+        - method: "GET"
+          path: "/api"
+
+  # Explicit deny
+  egressDeny:
+  - toEndpoints:
+    - matchLabels:
+        app: nginx-backend   
+---
+
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: frontend-egress-control
+  namespace: demo
+spec:
+  endpointSelector:
+    matchLabels:
+      app: nginx-frontend
+
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: allowdemo
+
+
+---
+
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: deny-frontend-to-denydemo
+  namespace: demo
+spec:
+  endpointSelector:
+    matchLabels:
+      app: nginx-frontend
+
+  egressDeny:
+  - toEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: denydemo
+---
