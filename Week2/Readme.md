@@ -174,6 +174,7 @@ ETCDCTL_API=3 etcdctl snapshot save snapshot.db   --endpoints=https://127.0.0.1:
 systemctl stop kubelet
 pkill kubelet
 ls /var/lib/etcd
+rmdir /var/lib/etcd
 ETCDCTL_API=3 etcdctl snapshot restore /snapshot.db \
   --data-dir=/var/lib/etcd
 systemctl start kubelet
@@ -187,6 +188,7 @@ docker restart etcd-control-plane
   docker stop etcd-new-cluster-restore-control-plane
   docker cp snapshot.db etcd-new-cluster-restore-control-plane:/snapshot.db
   docker start etcd-new-cluster-restore-control-plane
+  docker exec -it etcd-new-cluster-restore-control-plane bash
   pkill kubelet
   rm -rf /var/lib/etcd
   apt update
