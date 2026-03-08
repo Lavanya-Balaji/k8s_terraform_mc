@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-demo
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: echo
+  template:
+    metadata:
+      labels:
+        app: echo
+    spec:
+      containers:
+      - name: echo
+        image: ecomu/echo-server:latest
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo-service
+  namespace: default
+spec:
+  selector:
+    app: echo
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: echo-route
+  namespace: default
+spec:
+  parentRefs:
+  - name: kong-gateway          # Must match your Gateway name
+    namespace: kong     # Namespace where your Gateway is deployed
+  # SPECIFY HOST HERE: Matches the incoming 'Host' header
+  hostnames:
+  - "api.example.com"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /demo
+    backendRefs:
+    - name: echo-service
+      port: 80    

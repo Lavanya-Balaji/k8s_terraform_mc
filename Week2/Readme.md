@@ -316,21 +316,44 @@ kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/downloa
 
 kubectl get crds | grep gateway
 
+# Install Cilium API 
+
+cilium upgrade \
+  --set gatewayAPI.enabled=true
+
+
 # Install Kong Gateway API Controller - creates Gateway, GatewayClass, Routes 
 
-helm upgrade --install kgo kong/gateway-operator \
-  -n kong-system \
-  --create-namespace \
-  --skip-crds
+helm repo add kong https://charts.konghq.com
+helm repo update
+# Install Kong Enterprise (or OSS image by adjusting values)
+helm install kong kong/kong -n kong --create-namespace --set ingressController.enabled=true
 
 kubectl get pods -n kong-system
 kg gatewayclass 
 # Create Gateway Class: 
 
-kubectl apply -f gatewayclass.yaml 
+echo "apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: cilium
+spec:
+  controllerName: io.cilium/gateway-controller" | kubectl apply -f -
+
 
 # Create Gateway: 
-kubectl apply -f gateway.yaml 
+echo "apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: web-gateway
+  namespace: default
+spec:
+  gatewayClassName: cilium
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80"  | kubectl apply -f -
+
 
 
 kubectl get gateway -n kong
