@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi
+        ports:
+        - containerPort: 6379
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+spec:
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-worker
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: redis-worker
+  template:
+    metadata:
+      labels:
+        app: redis-worker
+    spec:
+      containers:
+      - name: worker
+        image: busybox
+        command:
+        - /bin/sh
+        - -c
+        - "while true; do sleep 5; done"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+---
+
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: redis-scaler
+spec:
+  scaleTargetRef:
+    name: redis-worker
+  minReplicaCount: 0
+  maxReplicaCount: 5
+  triggers:
+  - type: redis
+    metadata:
+      address: redis.default.svc.cluster.local:6379
+      listName: jobs
+      listLength: "5"

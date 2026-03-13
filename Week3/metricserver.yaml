@@ -1,0 +1,193 @@
+# Metrics Server (kind-friendly) - full manifest
+# Apply:
+#   kubectl apply -f metrics-server-kind-full.yaml
+#
+# Wait:
+#   kubectl -n kube-system rollout status deploy/metrics-server
+#
+# Verify:
+#   kubectl top nodes
+#   kubectl top pods -A
+#
+# If you previously applied a broken metrics-server manifest with duplicate RBAC,
+# consider deleting old resources first (deploy/svc/apiservice/clusterrolebindings).
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: metrics-server
+  namespace: kube-system
+
+---
+# Allow metrics-server to read the extension-apiserver-authentication config
+# so it can validate front-proxy auth headers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: metrics-server-auth-reader
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+  - kind: ServiceAccount
+    name: metrics-server
+    namespace: kube-system
+
+---
+# Permissions for metrics-server to scrape kubelet stats and expose node/pod metrics.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:metrics-server
+rules:
+  - apiGroups: [""]
+    resources:
+      - nodes/metrics
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources:
+      - pods
+      - nodes
+      - nodes/stats
+      - namespaces
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:metrics-server
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:metrics-server
+subjects:
+  - kind: ServiceAccount
+    name: metrics-server
+    namespace: kube-system
+
+---
+# Aggregated reader role so users/components with view/edit/admin can read metrics.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:aggregated-metrics-reader
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+rules:
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list", "watch"]
+
+---
+# REQUIRED: aggregated API servers (like metrics-server) must be able to run
+# SubjectAccessReviews (and related delegated auth checks).
+# Binding to the built-in system:auth-delegator is the standard upstream approach.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metrics-server:system-auth-delegator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: metrics-server
+    namespace: kube-system
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metrics-server
+  namespace: kube-system
+  labels:
+    k8s-app: metrics-server
+spec:
+  selector:
+    k8s-app: metrics-server
+  ports:
+    - name: https
+      port: 443
+      targetPort: https
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-server
+  namespace: kube-system
+  labels:
+    k8s-app: metrics-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: metrics-server
+  template:
+    metadata:
+      labels:
+        k8s-app: metrics-server
+    spec:
+      serviceAccountName: metrics-server
+      priorityClassName: system-cluster-critical
+      containers:
+        - name: metrics-server
+          image: registry.k8s.io/metrics-server/metrics-server:v0.6.4
+          imagePullPolicy: IfNotPresent
+          args:
+            - --cert-dir=/tmp
+            # Expose HTTPS endpoint inside the pod on this port
+            - --secure-port=10250
+            # kind: kubelets use self-signed certs
+            - --kubelet-insecure-tls
+            # kind: prefer InternalIP/Hostname to reach kubelet
+            - --kubelet-preferred-address-types=InternalIP,Hostname,ExternalIP
+            - --metric-resolution=15s
+          ports:
+            - name: https
+              containerPort: 10250
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: https
+              scheme: HTTPS
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: https
+              scheme: HTTPS
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+---
+# Register the aggregated API endpoint (metrics.k8s.io) with the main apiserver.
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1beta1.metrics.k8s.io
+spec:
+  group: metrics.k8s.io
+  version: v1beta1
+  groupPriorityMinimum: 100
+  versionPriority: 100
+  insecureSkipTLSVerify: true
+  service:
+    name: metrics-server
+    namespace: kube-system

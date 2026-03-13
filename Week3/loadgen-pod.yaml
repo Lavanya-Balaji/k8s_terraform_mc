@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: loadgen
+  namespace: vpa-demo
+  labels:
+    app: loadgen
+spec:
+  restartPolicy: Never
+  containers:
+  - name: loadgen
+    image: busybox:1.36
+    command:
+    - sh
+    - -lc
+    - |
+      echo "Generating load on http://vpa-sample-app/ ..."
+      while true; do
+        # 10 requests per loop to increase load a bit
+        for i in 1 2 3 4 5 6 7 8 9 10; do
+          wget -q -O- http://vpa-sample-app/ >/dev/null
+        done
+      done

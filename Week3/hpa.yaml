@@ -1,0 +1,157 @@
+# Kind-friendly, guaranteed-working HPA demo (minimal resources) + service you can curl.
+#
+# What this fixes for you:
+# - Uses a known-good HTTP server image (nginx) so curl won't hang/fail.
+# - Includes a /health endpoint (readiness/liveness) so Service only routes to ready pods.
+# - Minimal but valid requests/limits so HPA can compute CPU utilization.
+# - Includes Namespace, Deployment, Service, and HPA in one file.
+#
+# Apply:
+#   kubectl apply -f hpa-kind-working-minimal.yaml
+#
+# Test curl (in-cluster):
+#   kubectl -n hpa-testing run -it --rm curltest --image=curlimages/curl:8.5.0 --restart=Never -- \
+#     sh -lc 'curl -v --max-time 5 http://hpa-test-app.hpa-testing.svc.cluster.local/health'
+#
+# Generate load (best): use a CPU burner pod targeting the app
+#   kubectl -n hpa-testing run -it --rm hey --image=rakyll/hey:latest --restart=Never -- \
+#     -z 2m -c 50 http://hpa-test-app.hpa-testing.svc.cluster.local/
+#
+# Watch scaling:
+#   kubectl -n hpa-testing get hpa -w
+#   kubectl -n hpa-testing get pods -l app=hpa-test-app -w
+#   kubectl -n hpa-testing top pods -l app=hpa-test-app
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hpa-testing
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hpa-test-app-nginx-conf
+  namespace: hpa-testing
+data:
+  default.conf: |
+    server {
+      listen 8080;
+      server_name _;
+
+      location /health {
+        add_header Content-Type text/plain;
+        return 200 "ok\n";
+      }
+
+      location / {
+        add_header Content-Type text/plain;
+        return 200 "hello from hpa-test-app\n";
+      }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hpa-test-app
+  namespace: hpa-testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hpa-test-app
+  template:
+    metadata:
+      labels:
+        app: hpa-test-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - name: http
+              containerPort: 8080
+          # Minimal resources; keep requests low but non-zero so HPA can work.
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            timeoutSeconds: 1
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 1
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: hpa-test-app-nginx-conf
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hpa-test-app
+  namespace: hpa-testing
+spec:
+  selector:
+    app: hpa-test-app
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-test-app
+  namespace: hpa-testing
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hpa-test-app
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 4
+          periodSeconds: 15
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 120
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 30
+      selectPolicy: Max
