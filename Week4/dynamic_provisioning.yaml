@@ -1,0 +1,43 @@
+# -----------------------------
+# Persistent Volume Claim
+# -----------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dynamic-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+
+# -----------------------------
+# Deployment using Dynamic PVC
+# -----------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-dynamic-storage-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-dynamic-storage
+  template:
+    metadata:
+      labels:
+        app: nginx-dynamic-storage
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        volumeMounts:
+        - name: storage-volume
+          mountPath: /usr/share/nginx/html/data
+      volumes:
+      - name: storage-volume
+        persistentVolumeClaim:
+          claimName: dynamic-pvc

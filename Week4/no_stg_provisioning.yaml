@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-no-storage-deployment
+  labels:
+    app: nginx-no-storage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-no-storage
+  template:
+    metadata:
+      labels:
+        app: nginx-no-storage
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80

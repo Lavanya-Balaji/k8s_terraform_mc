@@ -1,0 +1,30 @@
+namespace: demo
+
+replicaCount: 1
+
+image:
+  repository: nginx
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources:
+  requests:
+    cpu: 100m
+  limits:
+    cpu: 200m
+
+hpa:
+  minReplicas: 1
+  maxReplicas: 5
+  cpuUtilization: 50
+
+config:
+  APP_ENV: production
+  APP_NAME: demo-application
+
+secret:
+  DB_USER: admin
+  DB_PASSWORD: password123

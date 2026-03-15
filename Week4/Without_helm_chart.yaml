@@ -1,0 +1,175 @@
+# -----------------------------
+# Namespace
+# -----------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo
+
+---
+
+# -----------------------------
+# ConfigMap
+# -----------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-app-config
+  namespace: demo
+data:
+  APP_ENV: "production"
+  APP_NAME: "demo-application"
+
+---
+
+# -----------------------------
+# Secret
+# -----------------------------
+apiVersion: v1
+kind: Secret
+metadata:
+  name: demo-app-secret
+  namespace: demo
+type: Opaque
+stringData:
+  DB_USER: admin
+  DB_PASSWORD: password123
+
+---
+
+# -----------------------------
+# Service Account
+# -----------------------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: demo-app-sa
+  namespace: demo
+
+---
+
+# -----------------------------
+# Cluster Role
+# -----------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: demo-app-clusterrole
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get","list","watch"]
+
+---
+
+# -----------------------------
+# Cluster Role Binding
+# -----------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: demo-app-clusterrolebinding
+subjects:
+- kind: ServiceAccount
+  name: demo-app-sa
+  namespace: demo
+roleRef:
+  kind: ClusterRole
+  name: demo-app-clusterrole
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+# -----------------------------
+# Deployment
+# -----------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app
+  namespace: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-app
+  template:
+    metadata:
+      labels:
+        app: demo-app
+    spec:
+      serviceAccountName: demo-app-sa
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "100m"
+          limits:
+            cpu: "200m"
+        env:
+        - name: APP_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: demo-app-config
+              key: APP_ENV
+        - name: APP_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: demo-app-config
+              key: APP_NAME
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: demo-app-secret
+              key: DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: demo-app-secret
+              key: DB_PASSWORD
+
+---
+
+# -----------------------------
+# Service
+# -----------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-app-service
+  namespace: demo
+spec:
+  selector:
+    app: demo-app
+  ports:
+  - port: 80
+    targetPort: 80
+  type: ClusterIP
+
+---
+
+# -----------------------------
+# Horizontal Pod Autoscaler
+# -----------------------------
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: demo-app-hpa
+  namespace: demo
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: demo-app
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50

@@ -1,0 +1,71 @@
+# -----------------------------
+# Persistent Volume (Admin)
+# -----------------------------
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: static-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  hostPath:
+    path: /mnt/data
+    type: DirectoryOrCreate
+
+---
+
+# -----------------------------
+# Persistent Volume Claim
+# -----------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: static-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  resources:
+    requests:
+      storage: 500Mi
+
+---
+
+# -----------------------------
+# Deployment generating logs
+# -----------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-storage-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-storage
+  template:
+    metadata:
+      labels:
+        app: nginx-storage
+    spec:
+      containers:
+      - name: log-generator
+        image: busybox
+        command: ["/bin/sh"]
+        args:
+          - -c
+          - |
+            while true; do
+              echo "$(date) - Application running" >> /data/app.log;
+              sleep 5;
+            done
+        volumeMounts:
+        - name: storage-volume
+          mountPath: /data
+      volumes:
+      - name: storage-volume
+        persistentVolumeClaim:
+          claimName: static-pvc
