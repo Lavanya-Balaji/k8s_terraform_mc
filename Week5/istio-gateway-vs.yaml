@@ -1,0 +1,44 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: myapp-gateway
+  namespace: my-namespace
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: myapp
+  namespace: my-namespace
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - myapp-gateway
+  http:
+  - match:
+    - uri:
+        prefix: "/api"
+    route:
+    - destination:
+        host: api-service.my-namespace.svc.cluster.local
+        port:
+          number: 80
+  - match:
+    - uri:
+        prefix: "/"
+    route:
+    - destination:
+        host: myapp.my-namespace.svc.cluster.local
+        port:
+          number: 80
