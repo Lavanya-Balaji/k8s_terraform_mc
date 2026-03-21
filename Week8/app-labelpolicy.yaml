@@ -1,0 +1,22 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: check-required-labels
+spec:
+  validationFailureAction: enforce  # can be "audit" to just warn
+  background: true
+  rules:
+    - name: check-mandatory-labels
+      match:
+        resources:
+          kinds:
+            - Deployment
+            - Pod
+            - Service
+      validate:
+        message: "The resource must have the required labels: app and environment."
+        pattern:
+          metadata:
+            labels:
+              app: "?*"
+              environment: "?*"
