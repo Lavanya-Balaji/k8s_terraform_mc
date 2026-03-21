@@ -23,5 +23,8 @@ Repo: https://charts.bitnami.com/bitnami
 chart: nginx-ingress-controller
 
 
-Source: https://github.com/Lavanya-Balaji/k8s_terraform_mc/tree/main/
-Path:
+
+### OCI Repo: 
+
+
+
