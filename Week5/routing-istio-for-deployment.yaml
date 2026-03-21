@@ -1,0 +1,152 @@
+# -------------------------------
+# Deployment: API Service
+# -------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-deployment
+  namespace: my-namespace
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+      - name: api
+        image: hashicorp/http-echo
+        args:
+        - "-text=Response from API Service"
+        ports:
+        - containerPort: 5678
+
+---
+# -------------------------------
+# Deployment: Web Service
+# -------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-deployment
+  namespace: my-namespace
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+      - name: web
+        image: hashicorp/http-echo
+        args:
+        - "-text=Response from Web Service"
+        ports:
+        - containerPort: 5678
+
+---
+# -------------------------------
+# Service: API
+# -------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-service
+  namespace: my-namespace
+spec:
+  selector:
+    app: api
+  ports:
+  - port: 80
+    targetPort: 5678
+
+---
+# -------------------------------
+# Service: Web
+# -------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+  namespace: my-namespace
+spec:
+  selector:
+    app: web
+  ports:
+  - port: 80
+    targetPort: 5678
+
+---
+# -------------------------------
+# Istio Gateway
+# -------------------------------
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: my-gateway
+  namespace: my-namespace
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+
+---
+# -------------------------------
+# VirtualService: API
+# -------------------------------
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: api-vs
+  namespace: my-namespace
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - my-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /api
+    route:
+    - destination:
+        host: api-service
+        port:
+          number: 80
+
+---
+# -------------------------------
+# VirtualService: Web
+# -------------------------------
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: web-vs
+  namespace: my-namespace
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - my-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /web
+    route:
+    - destination:
+        host: web-service
+        port:
+          number: 80

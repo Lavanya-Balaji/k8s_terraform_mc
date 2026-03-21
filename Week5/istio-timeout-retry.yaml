@@ -1,0 +1,89 @@
+# -------------------------------
+# Deployment: API (httpbin with delay support)
+# -------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: my-namespace
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+      - name: api
+        image: kennethreitz/httpbin
+        ports:
+        - containerPort: 80
+
+---
+# -------------------------------
+# Service
+# -------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-service
+  namespace: my-namespace
+spec:
+  selector:
+    app: api
+  ports:
+  - port: 80
+    targetPort: 80
+
+---
+# -------------------------------
+# Istio Gateway
+# -------------------------------
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: my-gateway
+  namespace: my-namespace
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+
+---
+# -------------------------------
+# VirtualService (Delay + Timeout)
+# -------------------------------
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: api-vs
+  namespace: my-namespace
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - my-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /api
+
+    rewrite:
+      uri: /delay/3   # 👈 3 second delay from httpbin
+
+    route:
+    - destination:
+        host: api-service
+        port:
+          number: 80
+
+    timeout: 2s   # ⏱️ timeout < delay → will fail

@@ -1,0 +1,119 @@
+# -------------------------------
+# Deployment: API (slow service)
+# -------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: my-namespace
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+      - name: api
+        image: hashicorp/http-echo
+        ports:
+        - containerPort: 80
+
+---
+# -------------------------------
+# Service
+# -------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-service
+  namespace: my-namespace
+spec:
+  selector:
+    app: api
+  ports:
+  - port: 80
+    targetPort: 80
+
+---
+# -------------------------------
+# Istio Gateway
+# -------------------------------
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: my-gateway
+  namespace: my-namespace
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+
+---
+# -------------------------------
+# DestinationRule (Circuit Breaker)
+# -------------------------------
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: api-destination
+  namespace: my-namespace
+spec:
+  host: api-service
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 1
+      http:
+        http1MaxPendingRequests: 1
+        maxRequestsPerConnection: 1
+
+    outlierDetection:
+      consecutive5xxErrors: 1
+      interval: 5s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 100
+
+---
+# -------------------------------
+# VirtualService (Timeout + Retry)
+# -------------------------------
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: api-vs
+  namespace: my-namespace
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - my-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /api
+
+    rewrite:
+      uri: /delay/3   # 👈 slow response
+
+    route:
+    - destination:
+        host: api-service
+        port:
+          number: 80
+
+    timeout: 2s   # ⏱️ less than delay → timeout
+
+    retries:
+      attempts: 3
+      perTryTimeout: 2s
+      retryOn: gateway-error,connect-failure,refused-stream,5xx
