@@ -2,7 +2,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   namespace: nginx-app
-  name: nginx-role
+  name: argo-manual-ui-app 
 rules:
   - apiGroups: [""]
     resources: ["pods", "services"]
