@@ -73,6 +73,10 @@ kubectl run nginx2 --image=nginx -n kube-system
 kubectl auth can-i get pods --as=cluster-user -n default
 kubectl auth can-i get pods --as=cluster-user -n kube-system
 
+kubectl auth can-i list pods \
+--as=system:serviceaccount:demo-ns:limited-sa \
+-n demo-ns
+
 # Helm charts 
  kubectl apply -f Without_helm_chart.yaml
  helm create demo-app
@@ -90,4 +94,3 @@ kubectl auth can-i get pods --as=cluster-user -n kube-system
   --namespace kube-system \
   --set kubeProxyReplacement=true \
   --set gatewayAPI.enabled=true
-  

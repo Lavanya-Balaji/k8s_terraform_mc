@@ -27,3 +27,41 @@ roleRef:
   kind: ClusterRole
   name: cluster-pod-reader
   apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-ns
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: limited-sa
+  namespace: demo-ns
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: limited-role
+  namespace: demo-ns
+rules:
+- apiGroups: ["", "apps"]
+  resources: ["pods", "deployments"]
+  verbs: ["get", "list", "watch", "create"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: limited-binding
+  namespace: demo-ns
+subjects:
+- kind: ServiceAccount
+  name: limited-sa
+  namespace: demo-ns
+roleRef:
+  kind: Role
+  name: limited-role
+  apiGroup: rbac.authorization.k8s.io
