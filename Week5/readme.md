@@ -94,11 +94,17 @@ for i in $(seq 1 200); do curl -s http://172.18.255.202/api; echo; done | sort |
 kubectl delete -f istio-canary-dpeloyment.yaml
 
 
-## Test Time Outs 
+## Test Time Outs and retry
 
 kubectl apply -f istio-timeout.yaml
 kubectl port-forward svc/istio-ingressgateway -n istio-system 8082:80
 curl -v http://127.0.0.1:8082/api # Expected Result is "upstream request timeout" - app takes 5 seconds and istio allows only 2 seconds 
+
+docker exec -it istio-control-plane  /bin/sh
+
+
+apt update && apt install -y curl 
+
 
 
 ## kiali Intallation: 

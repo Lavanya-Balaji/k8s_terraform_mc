@@ -1,20 +1,22 @@
 # -------------------------------
-# Deployment: API (httpbin with delay support)
+# Deployment: API v1
 # -------------------------------
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: api
+  name: api-v1
   namespace: my-namespace
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: api
+      version: v1
   template:
     metadata:
       labels:
         app: api
+        version: v1
     spec:
       containers:
       - name: api
@@ -24,7 +26,34 @@ spec:
 
 ---
 # -------------------------------
-# Service
+# Deployment: API v2 (mirror target)
+# -------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-v2
+  namespace: my-namespace
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+      version: v2
+  template:
+    metadata:
+      labels:
+        app: api
+        version: v2
+    spec:
+      containers:
+      - name: api
+        image: kennethreitz/httpbin
+        ports:
+        - containerPort: 80
+
+---
+# -------------------------------
+# Service (shared)
 # -------------------------------
 apiVersion: v1
 kind: Service
@@ -60,7 +89,26 @@ spec:
 
 ---
 # -------------------------------
-# VirtualService (Delay + Timeout)
+# DestinationRule (for subsets)
+# -------------------------------
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: api-dr
+  namespace: my-namespace
+spec:
+  host: api-service
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+  - name: v2
+    labels:
+      version: v2
+
+---
+# -------------------------------
+# VirtualService (Mirroring)
 # -------------------------------
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
@@ -78,44 +126,18 @@ spec:
         prefix: /api
 
     rewrite:
-      uri: /delay/3   # 👈 3 second delay from httpbin
+      uri: /get   # normal request
 
     route:
     - destination:
         host: api-service
+        subset: v1
         port:
           number: 80
 
-    timeout: 2s   # ⏱️ timeout < delay → will fail
----
+    mirror:
+      host: api-service
+      subset: v2
 
-apiVersion: networking.istio.io/v1beta1
-kind: VirtualService
-metadata:
-  name: api-vs
-  namespace: my-namespace
-spec:
-  hosts:
-  - "*"
-  gateways:
-  - my-gateway
-  http:
-  - match:
-    - uri:
-        prefix: /api
-
-    rewrite:
-      uri: /delay/3   # 3s delay
-
-    route:
-    - destination:
-        host: api-service
-        port:
-          number: 80
-
-    timeout: 2s   # per request timeout
-
-    retries:
-      attempts: 3                # 🔁 total tries (1 original + 2 retries)
-      perTryTimeout: 2s          # ⏱️ timeout per attempt
-      retryOn: gateway-error,connect-failure,refused-stream,5xx
+    mirrorPercentage:
+      value: 100.0
