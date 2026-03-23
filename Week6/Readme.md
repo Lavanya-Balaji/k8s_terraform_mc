@@ -78,4 +78,18 @@ chart: nginx-ingress-controller
 ### OCI Repo: 
 
 
+# Install cert Manager, Ingress , MetaLB
+
+kubectl apply -f cert-manager.yaml 
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.5/config/manifests/metallb-native.yaml
+
+kubectl apply -f metalb.yaml
+
+kubectl apply -f clusterissuer.yaml
+kubectl apply -f ingress-with-tls.yaml
+kubectl apply -f ingress-test-app.yaml
+docker exec -it argo-control-plane /bin/sh
+curl -k https://myapp.172.18.255.200.nip.io -> Accessing an application with https 
 
