@@ -93,3 +93,7 @@ kubectl apply -f ingress-test-app.yaml
 docker exec -it argo-control-plane /bin/sh
 curl -k https://myapp.172.18.255.200.nip.io -> Accessing an application with https 
 
+
+
+## Deploy kyverno App 
+kubectl apply -f kyverno.yaml 
