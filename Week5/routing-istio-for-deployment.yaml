@@ -101,7 +101,10 @@ spec:
       name: http
       protocol: HTTP
     hosts:
-    - "*"
+    - "*" # app2.com
+
+
+
 
 ---
 # -------------------------------

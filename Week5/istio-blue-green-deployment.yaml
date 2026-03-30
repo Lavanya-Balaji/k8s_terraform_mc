@@ -137,6 +137,6 @@ spec:
     route:
     - destination:
         host: api-service
-        subset: green # 🔥 Start with GREEN active
+        subset: blue # 🔥 Start with GREEN active
         port:
           number: 80

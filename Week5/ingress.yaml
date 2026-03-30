@@ -70,16 +70,18 @@ spec:
     targetPort: 8080
 
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: networking.k8s.io/v1 # gateway.networking.k8s.io/v1beta1 # networking.istio.io/v1beta1
+kind: Ingress # Gateway # httproute
 metadata:
   name: myapp-ingress
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
+
 spec:
-  ingressClassName: nginx
+  ingressClassName: nginx # istio # kong # traefik
   rules:
   - http:
+   # host: app.com 
       paths:
       - path: /
         pathType: Prefix
@@ -95,3 +97,22 @@ spec:
             name: api-service
             port:
               number: 80
+
+  - http:
+   # host: app2.com 
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: myapp1
+            port:
+              number: 80
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: api-service2
+            port:
+              number: 80
+
