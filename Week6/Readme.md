@@ -87,6 +87,7 @@ chart: nginx-ingress-controller
 
 
 # Install cert Manager, Ingress , MetaLB
+
 ```
 kubectl apply -f cert-manager.yaml 
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
