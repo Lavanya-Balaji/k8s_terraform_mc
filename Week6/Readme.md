@@ -105,6 +105,18 @@ curl -k https://myapp.172.18.255.200.nip.io -> Accessing an application with htt
 ```
 
 ## Deploy kyverno App 
+
 ```
-kubectl apply -f kyverno.yaml 
+helm repo add kyverno https://kyverno.github.io/kyverno/
+helm repo update
+helm install kyverno kyverno/kyverno \
+  --namespace kyverno --create-namespace \
+  --set replicaCount=2
+```
+
+## Validate Kyverno policy 
+
+```
+kubectl apply -f validate-kyverno-policy.yaml
+
 ```
