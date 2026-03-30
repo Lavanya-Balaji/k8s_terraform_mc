@@ -14,6 +14,20 @@ spec:
       values: |
         crds:
           install: true
+        cleanupController:
+          enabled: false
+
+        cleanupJobs:
+          admissionReports:
+            enabled: false
+          clusterAdmissionReports:
+            enabled: false
+          ephemeralReports:
+            enabled: false
+          clusterEphemeralReports:
+            enabled: false
+          updateRequests:
+            enabled: false          
 
   destination:
     server: https://kubernetes.default.svc
@@ -25,3 +39,9 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+
+
+--- 
+
+## Annotation Error : 
+
