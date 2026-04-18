@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-affinity
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx-aff
+  template:
+    metadata:
+      labels:
+        app: nginx-aff
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: disktype
+                    operator: In
+                    values:
+                      - hdd
+      containers:
+        - name: nginx
+          image: nginx:stable
+
+---           
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-affinity-soft
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx-aff
+  template:
+    metadata:
+      labels:
+        app: nginx-aff
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 1
+              preference:
+                matchExpressions:
+                  - key: disktype
+                    operator: In
+                    values:
+                      - hdd
+                      
+            - weight: 2
+              preference:
+                matchExpressions:
+                  - key: disktype
+                    operator: In
+                    values:
+                   
+                      - sdd                      
+      containers:
+        - name: nginx
+          image: nginx:stable
