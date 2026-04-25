@@ -1,0 +1,91 @@
+apiVersion: karpenter.sh/v1beta1
+kind: NodePool
+metadata:
+  name: gpu
+spec:
+  disruption:
+    consolidationPolicy: WhenUnderutilized
+    expireAfter: Never
+  template:
+    metadata:
+      labels:
+        instancegroup: gpu-spot-mix
+    spec:
+      nodeClassRef:
+        name: gpu
+      taints:
+      - key: nvidia.com/gpu
+        value: "true"
+        effect: NoSchedule
+      requirements:
+      - key: karpenter.k8s.aws/instance-family
+        operator: In
+        values:
+        - g4dn
+      - key: karpenter.k8s.aws/instance-generation
+        operator: Gt
+        values:
+        - "2"
+      - key: topology.kubernetes.io/zone
+        operator: In
+        values:
+        - eu-west-1a
+        - eu-west-1b
+        - eu-west-1c
+      - key: kubernetes.io/os
+        operator: In
+        values:
+        - linux
+      - key: kubernetes.io/arch
+        operator: In
+        values:
+        - amd64
+      - key: karpenter.sh/capacity-type
+        operator: In
+        values:
+        - on-demand
+---
+apiVersion: karpenter.k8s.aws/v1beta1
+kind: EC2NodeClass
+metadata:
+  name: gpu
+spec:
+  amiFamily: AL2
+  amiSelectorTerms:
+  - id: ami-09c72f5008c37c040
+  blockDeviceMappings:
+  - deviceName: /dev/sda1
+    ebs:
+      deleteOnTermination: true
+      encrypted: true
+      iops: 3000
+      throughput: 150
+      volumeSize: 50Gi
+      volumeType: gp3
+  role: "Karpenter-qa-bakery-poc-qa-20240220163019150400000006"
+  securityGroupSelectorTerms:
+  - tags:
+      karpenter.sh/discovery: qa-bakery-poc-qa
+  subnetSelectorTerms:
+  - tags:
+      karpenter.sh/discovery: qa-bakery-poc-qa
+  userData: |
+    MIME-Version: 1.0
+    Content-Type: multipart/mixed; boundary="BOUNDARY"
+
+    --BOUNDARY
+    Content-Type: text/x-shellscript; charset="us-ascii"
+
+    #!/bin/bash
+    echo "Running custom user data script"
+    if ( lsblk | fgrep -q nvme1n1 ); then
+        mkdir -p /mnt/data /var/lib/kubelet /var/lib/containerd
+        mkfs.xfs /dev/nvme1n1
+        mount /dev/nvme1n1 /mnt/data
+        chmod 0755 /mnt/data
+        mv /var/lib/kubelet /mnt/data/
+        mv /var/lib/containerd /mnt/data/
+        ln -sf /mnt/data/kubelet /var/lib/kubelet
+        ln -sf /mnt/data/containerd /var/lib/containerd
+    fi
+    --BOUNDARY

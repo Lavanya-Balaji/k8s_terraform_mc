@@ -1,0 +1,78 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: karpenter
+  namespace: cluster-core
+spec:
+  interval: 10m
+  upgrade:
+    timeout: 10m0s
+    crds: CreateReplace
+  install:
+    timeout: 10m0s
+    crds: CreateReplace
+    remediation:
+      retries: -1
+  chart:
+    spec:
+      chart: karpenter
+      sourceRef:
+        kind: HelmRepository
+        name: karpenter-aws
+        namespace: cluster-core
+      version: $(KARPENTER_AWS_HELM_VERSION)
+  test:
+    enable: false
+  values:
+    serviceAccount:
+      annotations:
+        eks.amazonaws.com/role-arn: ${KARPENTER_IRSA_ARN}
+    serviceMonitor:
+      enabled: false
+    hostNetwork: true
+    nodeSelector:
+      kubernetes.io/os: linux
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: karpenter.sh/nodepool
+                  operator: DoesNotExist
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - podAffinityTerm: 
+            topologyKey: "topology.kubernetes.io/zone"
+          weight: 10
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+    tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+    controller:
+      resources:
+       requests:
+         cpu: 1
+         memory: 1Gi
+       limits:
+         cpu: 1
+         memory: 1Gi
+      metrics:
+        port: 16000
+      healthProbe:
+        port: 16001
+    webhook:
+      enabled: true
+      port: 16002
+      metrics:
+        port: 16004
+    logConfig:
+      enabled: true
+    settings:
+      clusterName: "${CLUSTER_NAME}"
+      interruptionQueue: "${KARPENTER_INTERRUPTION_QUEUE}"
+      featureGates:
+        drift: true
+        spotToSpotConsolidation: false
