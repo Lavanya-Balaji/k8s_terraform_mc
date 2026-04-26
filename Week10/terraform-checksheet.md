@@ -33,6 +33,30 @@ terraform destroy → Delete all resources
 terraform destroy -target=<resource> → Delete specific resource
 
 
+### 🌍 Workspaces (Environments)
+terraform workspace list → List workspaces
+terraform workspace new <name> → Create workspace
+terraform workspace select <name> → Switch workspace
+### 🔍 Debugging
+TF_LOG=DEBUG terraform apply → Enable debug logs
+terraform providers → Show provider dependencies
+
+### ⚡ Common Workflow
+terraform init
+terraform plan
+terraform apply
+
+
+###  Quick Tips
+Always review the plan before apply
+Enable versioning of tfstate
+Use remote backend for teams
+Avoid -target unless necessary
+Prefer for_each over count
+Never store secrets in code - use sensitive=true and use secret manager to retrive the secrets using the data block
+
+
+## Repo structure
 
 terraform-repo/
 │
